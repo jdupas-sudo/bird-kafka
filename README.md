@@ -48,12 +48,14 @@ HTML reports are written to `./gatling-results/`.
 By default, this runs all discovered simulations sequentially:
 - `birds.BirdsApiSimulation`
 - `birds.KafkaDirectSimulation`
+- `birds.KafkaLagSimulation`
 
 To run only one simulation, pass `gatling.simulationClass`:
 
 ```bash
 docker compose --profile test run gatling -Dgatling.simulationClass=birds.BirdsApiSimulation
 docker compose --profile test run gatling -Dgatling.simulationClass=birds.KafkaDirectSimulation
+docker compose --profile test run gatling -Dgatling.simulationClass=birds.KafkaLagSimulation
 ```
 
 ### Configuration
@@ -73,6 +75,10 @@ docker compose --profile test run -e USERS=50 -e DURATION=60 gatling
 | `KAFKA_DIRECT_MESSAGES_PER_USER` | `30` | Direct Kafka sends each virtual user performs in `KafkaDirectSimulation` |
 | `KAFKA_DIRECT_HOT_KEY_BIRD_ID` | `1` | Fixed key used in the hot-partition direct Kafka scenario |
 | `KAFKA_DIRECT_LARGE_NOTES_BYTES` | `4096` | Size of the `notes` field in the large-payload direct Kafka scenario |
+| `KAFKA_LAG_USERS` | `max(1, USERS / 2)` | Virtual users in `KafkaLagSimulation` |
+| `KAFKA_LAG_MAX_POLLS` | `20` | Max `/api/events` polls per probe before fail |
+| `KAFKA_LAG_POLL_INTERVAL_MS` | `250` | Delay between lag-poll attempts |
+| `KAFKA_LAG_EVENTS_LIMIT` | `200` | Event page size used by lag polling |
 
 `BirdsApiSimulation` supports these load profiles:
 - `smoke`: `atOnceUsers(1)`
@@ -98,6 +104,11 @@ docker compose --profile test run -e USERS=50 -e DURATION=60 gatling
 - spread keys + small payload + `acks=all`
 - spread keys + large payload + `acks=1`
 
+`KafkaLagSimulation` is a dedicated pass/fail consumer-lag check:
+- sends one async `POST /api/kafka/sightings` probe per VU
+- polls `/api/events?event_type=sighting.created` until that probe appears
+- fails the final verification check when the probe is not observed within the poll budget
+
 ## Project Structure
 
 ```
@@ -114,6 +125,8 @@ docker compose --profile test run -e USERS=50 -e DURATION=60 gatling
 │   └── src/test/
 │       ├── java/birds/
 │       │   ├── BirdsApiSimulation.java   # Lean orchestrator: protocol + injection profile
+│       │   ├── KafkaDirectSimulation.java # Pure producer-side Kafka publish load
+│       │   ├── KafkaLagSimulation.java    # Dedicated consumer-lag pass/fail probe
 │       │   ├── endpoints/
 │       │   │   ├── BirdEndpoints.java    # Atomic request definitions (CRUD + sub-resources)
 │       │   │   └── SystemEndpoints.java  # health, stats, events
@@ -122,6 +135,7 @@ docker compose --profile test run -e USERS=50 -e DURATION=60 gatling
 │       │   │   ├── SearchGroup.java      # Keyword search journey
 │       │   │   ├── CreateCleanupGroup.java  # Full write lifecycle + Kafka events
 │       │   │   ├── KafkaSightingGroup.java  # Async sighting ingest via Kafka
+│       │   │   ├── KafkaLagGroup.java       # Poll-until-visible lag probe logic
 │       │   │   └── EventsGroup.java         # Kafka consumer lag check
 │       │   └── utils/
 │       │       ├── Config.java           # Env-var configuration (TARGET_URL, USERS, DURATION)
