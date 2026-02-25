@@ -4,3 +4,7 @@
 
 # Gatling/Maven build output
 gatling/target/
+
+# Local editor/agent settings
+.vscode/
+.claude/
