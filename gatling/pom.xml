@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>birds</groupId>
+    <artifactId>birds-gatling</artifactId>
+    <version>1.0.0</version>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <gatling.version>3.13.5</gatling.version>
+        <gatling-maven-plugin.version>4.21.0</gatling-maven-plugin.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.gatling.highcharts</groupId>
+            <artifactId>gatling-charts-highcharts</artifactId>
+            <version>${gatling.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Gatling Kafka plugin (galaxio) for direct producer load testing.
+            Source: https://docs.gatling.io/guides/use-cases/kafka/
+
+            The plugin's default transitive tree pulls in Confluent-edition kafka-clients
+            (kafka-clients:*-ce) and Confluent Avro serializers, which:
+              1. Force Jackson to a version older than 2.15, breaking Gatling's
+                 StreamReadConstraints usage and causing NoClassDefFoundError at startup.
+              2. Are not needed for our JSON StringSerializer scenario.
+
+            Fix: exclude all Confluent-specific transitives and supply the standard
+            Apache kafka-clients instead.  ProducerConfig, StringSerializer, and
+            RecordHeaders (the only classes we use) are identical in both distributions.
+        -->
+        <dependency>
+            <groupId>org.galaxio</groupId>
+            <artifactId>gatling-kafka-plugin_2.13</artifactId>
+            <version>1.0.0-RC1</version>
+            <scope>test</scope>
+            <exclusions>
+                <!-- Confluent edition of kafka-clients — replaced by Apache below -->
+                <exclusion>
+                    <groupId>org.apache.kafka</groupId>
+                    <artifactId>kafka-clients</artifactId>
+                </exclusion>
+                <!-- Confluent-only streams artifact, not needed for plain produce -->
+                <exclusion>
+                    <groupId>org.apache.kafka</groupId>
+                    <artifactId>kafka-streams-scala_2.13</artifactId>
+                </exclusion>
+                <!-- Confluent Schema Registry / Avro — not used (StringSerializer only) -->
+                <exclusion>
+                    <groupId>io.confluent</groupId>
+                    <artifactId>kafka-streams-avro-serde</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.confluent</groupId>
+                    <artifactId>kafka-avro-serializer</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Standard Apache kafka-clients — provides ProducerConfig, StringSerializer, RecordHeaders -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>3.7.0</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Apache Streams Scala API required by the galaxio plugin internals (non-Confluent variant). -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-streams-scala_2.13</artifactId>
+            <version>3.7.0</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Keep SLF4J API aligned with Gatling 3.13 / logback 1.5 runtime. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.17</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Keep Jackson modules on one version to avoid runtime linkage errors:
+            Gatling 3.13 pulls jackson-databind 2.18.x while Kafka/Avro transitives
+            may pull older jackson-core/jackson-annotations.
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>2.18.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>2.18.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.18.3</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.gatling</groupId>
+                <artifactId>gatling-maven-plugin</artifactId>
+                <version>${gatling-maven-plugin.version}</version>
+                <configuration>
+                    <!-- Required on JDK 17 for Gatling's String internals access -->
+                    <jvmArgs>
+                        <jvmArg>--add-opens=java.base/java.lang=ALL-UNNAMED</jvmArg>
+                    </jvmArgs>
+                    <!-- Run all discovered Simulation classes sequentially by default. -->
+                    <runMultipleSimulations>true</runMultipleSimulations>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

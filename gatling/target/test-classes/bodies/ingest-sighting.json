@@ -1,0 +1,7 @@
+{
+  "bird_id": #{birdId},
+  "location": "Kafka Ingest Location",
+  "latitude": 51.5074,
+  "longitude": -0.1278,
+  "observer_name": "Kafka Publisher"
+}

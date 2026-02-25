@@ -1,0 +1,10 @@
+{
+  "common_name": "Load Test Bird #{uniqueId}",
+  "scientific_name": "Testus loadus #{uniqueId}",
+  "family": "Testidae",
+  "habitat": "Performance test environment",
+  "wingspan_cm": 42.0,
+  "weight_g": 100.0,
+  "conservation_status": "Least Concern",
+  "region": "Testland"
+}
